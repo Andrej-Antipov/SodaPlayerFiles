@@ -1,6 +1,7 @@
 import SwiftUI
 import Cocoa
 
+
 @main
 struct SodaPlayerOpenerApp: App {
     
@@ -13,14 +14,14 @@ struct SodaPlayerOpenerApp: App {
     }
     
     var body: some Scene {
-        // Заглушка для SwiftUI, которая никогда не покажет пустое окно
         Settings {
             EmptyView()
         }
     }
     
+    
+    
     func executeFolderOpening() {
-        // Извлекаем путь $TMPDIR
         guard let tmpDir = ProcessInfo.processInfo.environment["TMPDIR"] else {
             showSystemAlert()
             return
@@ -33,23 +34,19 @@ struct SodaPlayerOpenerApp: App {
         let fileExists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         
         if fileExists && isDirectory.boolValue {
-            // Папка есть -> Открываем в Finder и мгновенно выгружаем из памяти
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
             exit(0)
         } else {
-            // Папки нет -> Показываем ошибку
             showSystemAlert()
         }
     }
     
     func showSystemAlert() {
-        // Локализация текстов
         let systemLanguages = Locale.preferredLanguages
         let isRussian = systemLanguages.first?.hasPrefix("ru") ?? false
         let title = isRussian ? "Ошибка" : "Error"
         let msg = isRussian ? "Папка не существует." : "Folder does not exist."
         
-        // Создаем компактную панель (ширина 240, высота 160)
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 240, height: 160),
             styleMask: [.titled, .closable, .nonactivatingPanel, .utilityWindow],
@@ -57,27 +54,24 @@ struct SodaPlayerOpenerApp: App {
             defer: false
         )
         
-        panel.level = .screenSaver // Закрепляем окно поверх абсолютно всех окон в системе
+        panel.level = .screenSaver
         panel.title = title
         panel.center()
         
         let viewBounds = NSRect(x: 0, y: 0, width: panel.frame.width, height: panel.frame.height)
         let contentView = NSView(frame: viewBounds)
         
-        // 1. ИКОНКА ПРИЛОЖЕНИЯ: Расположена сверху по центру
         let imageView = NSImageView(frame: NSRect(x: 100, y: 105, width: 40, height: 40))
         imageView.image = NSImage(named: NSImage.applicationIconName)
         imageView.imageScaling = .scaleProportionallyUpOrDown
         contentView.addSubview(imageView)
         
-        // 2. ТЕКСТ: Находится строго под иконкой
         let label = NSTextField(labelWithString: msg)
         label.frame = NSRect(x: 16, y: 65, width: 208, height: 24)
         label.font = NSFont.systemFont(ofSize: 13)
         label.alignment = .center
         contentView.addSubview(label)
         
-        // 3. КНОПКА ОК: Идеально отцентрирована по вертикали
         let button = NSButton(title: "OK", target: nil, action: nil)
         button.frame = NSRect(x: 80, y: 16, width: 80, height: 32)
         button.bezelStyle = .rounded
@@ -88,24 +82,54 @@ struct SodaPlayerOpenerApp: App {
         panel.contentView = contentView
         panel.makeKeyAndOrderFront(nil)
         
-        // Принудительно активируем процесс утилиты
         if #available(macOS 14.0, *) {
             NSApp.activate()
         } else {
             NSApp.activate(ignoringOtherApps: true)
         }
         
-        // ВОСПРОИЗВЕДЕНИЕ КРАСИВОГО СИСТЕМНОГО ЗВУКА:
-        // Используем изолированный запуск afplay с нативным звуком Tink.
-        // Вывод ошибок глушится через пустые Pipe, чтобы не засорять консоль Xcode.
-        let soundProcess = Process()
-        soundProcess.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
-        soundProcess.arguments = ["/System/Library/Sounds/Tink.aiff"]
-        soundProcess.standardOutput = Pipe()
-        soundProcess.standardError = Pipe()
-        try? soundProcess.run()
+        // --- ТОЧНАЯ КОСВЕННАЯ ПРОВЕРКА DND ПО НАЙДЕННОМУ МАРКЕРУ ---
+        var isDNDActive = false
+        dprint("🔍 Проверка маркера 'VisibleCC FocusModes'...")
         
-        // Таймер автозакрытия панели через 2.5 секунды
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/plutil")
+        
+        // Извлекаем подтвержденный вами ключ напрямую из plist-файла
+        process.arguments = [
+            "-extract", "NSStatusItem VisibleCC FocusModes", "raw",
+            "-o", "-", "--",
+            "\(NSHomeDirectory())/Library/Preferences/com.apple.controlcenter.plist"
+        ]
+        process.standardOutput = pipe
+        process.standardError = Pipe() // Игнорируем ошибку, если ключа нет в файле (когда DND выключен)
+        
+        try? process.run()
+        process.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            dprint("📊 Значение маркера в системе: \(output)")
+            if output.lowercased() == "true" || output == "1" {
+                isDNDActive = true
+            }
+        }
+        
+        // Принятие окончательного решения о выводе звука
+        if !isDNDActive {
+            dprint("🔊 Режим Сон/DND выключен. Воспроизведение звука Funk.aiff...")
+            let soundProcess = Process()
+            soundProcess.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
+            soundProcess.arguments = ["/System/Library/Sounds/Funk.aiff"]
+            soundProcess.standardOutput = Pipe()
+            soundProcess.standardError = Pipe()
+            try? soundProcess.run()
+        } else {
+            dprint("🤫 Результат: Звук приглушен. Найден активный маркер VisibleCC FocusModes.")
+        }
+        // -----------------------------------------------------------
+        
         let timer = Timer(timeInterval: 2.5, repeats: false) { _ in
             exit(0)
         }

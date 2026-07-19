@@ -33,7 +33,7 @@ struct SodaPlayerOpenerApp: App {
         let fileExists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         
         if fileExists && isDirectory.boolValue {
-            // Папка есть -> Открываем в Finder и выгружаем из памяти
+            // Папка есть -> Открываем в Finder и мгновенно выгружаем из памяти
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
             exit(0)
         } else {
@@ -49,7 +49,7 @@ struct SodaPlayerOpenerApp: App {
         let title = isRussian ? "Ошибка" : "Error"
         let msg = isRussian ? "Папка не существует." : "Folder does not exist."
         
-        // Создаем панель в компактном вертикальном формате
+        // Создаем компактную панель (ширина 240, высота 160)
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 240, height: 160),
             styleMask: [.titled, .closable, .nonactivatingPanel, .utilityWindow],
@@ -57,7 +57,7 @@ struct SodaPlayerOpenerApp: App {
             defer: false
         )
         
-        panel.level = .screenSaver
+        panel.level = .screenSaver // Закрепляем окно поверх абсолютно всех окон в системе
         panel.title = title
         panel.center()
         
@@ -77,7 +77,7 @@ struct SodaPlayerOpenerApp: App {
         label.alignment = .center
         contentView.addSubview(label)
         
-        // 3. КНОПКА ОК: Центрирована по вертикали в нижнем пространстве
+        // 3. КНОПКА ОК: Идеально отцентрирована по вертикали
         let button = NSButton(title: "OK", target: nil, action: nil)
         button.frame = NSRect(x: 80, y: 16, width: 80, height: 32)
         button.bezelStyle = .rounded
@@ -88,32 +88,24 @@ struct SodaPlayerOpenerApp: App {
         panel.contentView = contentView
         panel.makeKeyAndOrderFront(nil)
         
-        // Активация процесса с учетом версии ОС
+        // Принудительно активируем процесс утилиты
         if #available(macOS 14.0, *) {
             NSApp.activate()
         } else {
             NSApp.activate(ignoringOtherApps: true)
         }
         
-        // ЗВУК С СОВМЕСТИМОСТЬЮ С macOS 11.0 (Big Sur)
-        let defaults = UserDefaults.standard
-        var isDNDActive = false
-
-        if #available(macOS 12.0, *) {
-            // Для macOS 12 и новее (Monterey, Ventura, Sonoma, Sequoia...)
-            let controlCenterPrefs = defaults.persistentDomain(forName: "com.apple.controlcenter")
-            isDNDActive = controlCenterPrefs?["NSStatusItem Visible FocusModes"] as? Int == 1
-        } else {
-            // Для macOS 11 (Big Sur)
-            let ncPrefs = defaults.persistentDomain(forName: "com.apple.notificationcenterui")
-            isDNDActive = ncPrefs?["doNotDisturb"] as? Bool ?? false
-        }
-
-        if !isDNDActive {
-            NSSound.beep()
-        }
+        // ВОСПРОИЗВЕДЕНИЕ КРАСИВОГО СИСТЕМНОГО ЗВУКА:
+        // Используем изолированный запуск afplay с нативным звуком Tink.
+        // Вывод ошибок глушится через пустые Pipe, чтобы не засорять консоль Xcode.
+        let soundProcess = Process()
+        soundProcess.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
+        soundProcess.arguments = ["/System/Library/Sounds/Tink.aiff"]
+        soundProcess.standardOutput = Pipe()
+        soundProcess.standardError = Pipe()
+        try? soundProcess.run()
         
-        // Таймер автозакрытия через 2.5 секунды
+        // Таймер автозакрытия панели через 2.5 секунды
         let timer = Timer(timeInterval: 2.5, repeats: false) { _ in
             exit(0)
         }
@@ -122,3 +114,4 @@ struct SodaPlayerOpenerApp: App {
         NSApp.run()
     }
 }
+

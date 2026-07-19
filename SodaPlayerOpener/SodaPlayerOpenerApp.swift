@@ -43,6 +43,10 @@ struct SodaPlayerOpenerApp: App {
     }
     
     func showSystemAlert() {
+        // Временно возвращаем режим обычного приложения,
+        // чтобы macOS разрешила перехватить фокус и показать окно поверх всех
+        NSApp.setActivationPolicy(.regular)
+        
         let alert = NSAlert()
         alert.alertStyle = .critical
         
@@ -59,24 +63,29 @@ struct SodaPlayerOpenerApp: App {
             alert.addButton(withTitle: "OK")
         }
         
-        let dummyWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
-            styleMask: .borderless,
-            backing: .buffered,
-            defer: false
-        )
-        dummyWindow.center()
+        // Поднимаем окно алерта на уровень системного статус-бара.
+        // Это гарантирует, что оно перекроет окна ЛЮБЫХ других запущенных программ.
+        alert.window.level = .statusBar
         
-        alert.beginSheetModal(for: dummyWindow) { _ in
+        // Активируем приложение
+        if #available(macOS 14.0, *) {
+            NSApp.activate()
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        
+        // Создаем таймер, но НЕ запускаем его автоматически
+        let timer = Timer(timeInterval: 2.5, repeats: false) { _ in
             exit(0)
         }
         
-        NSApp.activate(ignoringOtherApps: true)
+        // Принудительно добавляем таймер в режим обработки модальных окон.
+        // Это позволит ему сработать, даже когда поток заблокирован методом runModal()
+        RunLoop.current.add(timer, forMode: .common)
         
-        // Автозакрытие через 4 секунды с полной выгрузкой из ОЗУ
-        Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { _ in
-            exit(0)
-        }
+        // Запускаем окно в модальном режиме (теперь таймер закроет его через 2.5 сек)
+        alert.runModal()
+        exit(0)
     }
 }
 

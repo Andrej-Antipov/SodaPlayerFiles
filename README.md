@@ -10,6 +10,7 @@ A lightweight native macOS utility that automates opening the Soda Player torren
 * **Zero UI Overhead:** No Terminal window or Dock icons are displayed during execution.
 * **Smart Alerts:** Displays a native, system-styled macOS error dialog if the folder does not exist (supports EN/RU locales).
 * **Auto-Close:** The error dialog automatically disappears and terminates the application after 4 seconds.
+* * **FocusMode** Error dialog: mute sound for Don't Disturb Mode .
 
 ## 📦 Installation
 
@@ -39,6 +40,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 * **Без лишнего UI:** При запуске не открываются окна Терминала или иконки в панели Dock.
 * **Умные уведомления:** Если папки не существует, выводится аккуратное системное окно ошибки на языке вашей ОС (Русский/Английский).
 * **Автозакрытие:** Окно ошибки самостоятельно исчезает и закрывает программу ровно через 4 секунды.
+* **FocusMode** Сообщение об ошибке становится беззвучным если включен режим DND (сон или не беспокоить).
 
 ## 📦 Установка
 
